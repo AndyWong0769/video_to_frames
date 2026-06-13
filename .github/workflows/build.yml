@@ -10,7 +10,7 @@ env:
 
 jobs:
   build:
-    runs-on: macos-13
+    runs-on: macos-latest
 
     steps:
       - name: Checkout code
@@ -29,24 +29,34 @@ jobs:
         run: |
           brew install python-tk || true
 
-      - name: Download macOS ffmpeg & ffprobe static builds
+      - name: Install and bundle macOS ffmpeg & ffprobe
         run: |
-          echo "Downloading macOS static ffmpeg..."
-          curl -L -o ffmpeg.zip "https://evermeet.cx/ffmpeg/getrelease/zip"
-          unzip -o ffmpeg.zip
-          chmod +x ffmpeg
-          rm ffmpeg.zip
+          echo "Installing ffmpeg via Homebrew..."
+          brew install ffmpeg dylibbundler
 
-          echo "Downloading macOS static ffprobe..."
-          curl -L -o ffprobe.zip "https://evermeet.cx/ffmpeg/getrelease/ffprobe/zip"
-          unzip -o ffprobe.zip
-          chmod +x ffprobe
-          rm ffprobe.zip
+          # Copy native ARM64 binaries to working directory
+          cp "$(brew --prefix)/bin/ffmpeg" ./ffmpeg
+          cp "$(brew --prefix)/bin/ffprobe" ./ffprobe
+          chmod +x ffmpeg ffprobe
 
           echo "ffmpeg version:"
           ./ffmpeg -version 2>&1 | head -1
           echo "ffprobe version:"
           ./ffprobe -version 2>&1 | head -1
+
+          echo "Bundling dependent dylibs..."
+          # dylibbundler: copies all Homebrew dylibs + fixes load paths
+          # -od = overwrite existing, -b = bundle deps
+          # -x = binary to process, -d = dest dir for dylibs
+          # -p = new install name prefix (@executable_path = same dir as binary)
+          dylibbundler -od -b \
+            -x ./ffmpeg \
+            -x ./ffprobe \
+            -d ./libs/ \
+            -p @executable_path/libs/
+
+          echo "Bundled dylibs:"
+          ls -la ./libs/
 
       - name: Generate app icon (logo.icns)
         run: |
@@ -120,11 +130,17 @@ jobs:
       - name: Build macOS App with PyInstaller
         run: |
           export MACOSX_DEPLOYMENT_TARGET=11.0
+          # Build --add-binary args for all bundled dylibs
+          ADD_BINS="--add-binary ffmpeg:. --add-binary ffprobe:."
+          for dylib in libs/*.dylib; do
+            ADD_BINS="$ADD_BINS --add-binary $dylib:libs/"
+          done
+          echo "PyInstaller add-binary args: $ADD_BINS"
+
           pyinstaller --noconsole --windowed --onefile \
             --name "VideoToFrames" \
             --icon="logo.icns" \
-            --add-data "ffmpeg:." \
-            --add-data "ffprobe:." \
+            $ADD_BINS \
             "video_to_frames.py"
 
       - name: Create DMG
