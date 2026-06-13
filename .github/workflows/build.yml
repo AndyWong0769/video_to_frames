@@ -17,140 +17,85 @@ jobs:
         uses: actions/checkout@v4
 
       # ------------------------------------------------------------------
-      # Install Intel (x86_64) Homebrew under Rosetta 2 on the ARM64 runner
-      # so we can build an Intel binary that works on older Intel Macs and
-      # VMware virtual machines (which are always Intel x64).
+      # Use Rosetta 2 to install Intel Python via /usr/local/ Homebrew
+      # so the .app runs on Intel Macs (including VMware VMs).
       # ------------------------------------------------------------------
       - name: Setup Rosetta 2 Intel Homebrew
         run: |
-          # GitHub's ARM64 runners have Rosetta 2 pre-installed.
-          # Install a separate x86_64 Homebrew at /usr/local/
           if [ ! -f /usr/local/bin/brew ]; then
             arch -x86_64 /bin/bash -c \
               "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" \
               < /dev/null || true
           fi
-          echo "Intel Homebrew ready at /usr/local/bin/brew"
+          echo "Intel Homebrew ready"
 
-      - name: Install Intel ffmpeg, Python & toolchain
+      - name: Install Intel Python & PyInstaller
         run: |
           arch -x86_64 /bin/bash -c '
             eval "$(/usr/local/bin/brew shellenv)"
-            brew install ffmpeg dylibbundler python@3.11 python-tk
+            brew install python@3.11 python-tk
             pip3 install --upgrade pip
             pip3 install pyinstaller Pillow
           '
 
-      - name: Bundle Intel ffmpeg & ffprobe with their dylibs
+      # ------------------------------------------------------------------
+      # Download STATIC ffmpeg/ffprobe from evermeet.cx.
+      # These are self-contained x64 binaries — NO dylib dependencies.
+      # Runs natively on Intel Macs, and on ARM via Rosetta 2.
+      # ------------------------------------------------------------------
+      - name: Download static ffmpeg & ffprobe (Intel x64)
         run: |
-          arch -x86_64 /bin/bash -c '
-            eval "$(/usr/local/bin/brew shellenv)"
+          echo "Downloading static ffmpeg..."
+          curl -L -o ffmpeg.zip "https://evermeet.cx/ffmpeg/getrelease/zip"
+          if [ $? -ne 0 ] || ! unzip -o ffmpeg.zip; then
+            echo "getrelease/zip failed, trying specific version..."
+            curl -L -o ffmpeg.7z "https://evermeet.cx/ffmpeg/ffmpeg-7.1.1.7z"
+            7z x ffmpeg.7z -y || true
+          fi
+          chmod +x ffmpeg
+          rm -f ffmpeg.zip ffmpeg.7z
 
-            cp /usr/local/bin/ffmpeg ./ffmpeg
-            cp /usr/local/bin/ffprobe ./ffprobe
-            chmod +x ffmpeg ffprobe
+          echo "Downloading static ffprobe..."
+          curl -L -o ffprobe.zip "https://evermeet.cx/ffmpeg/getrelease/ffprobe/zip"
+          if [ $? -ne 0 ] || ! unzip -o ffprobe.zip; then
+            echo "getrelease/ffprobe/zip failed, trying specific version..."
+            curl -L -o ffprobe.7z "https://evermeet.cx/ffmpeg/ffprobe-7.1.1.7z"
+            7z x ffprobe.7z -y || true
+          fi
+          chmod +x ffprobe
+          rm -f ffprobe.zip ffprobe.7z
 
-            echo "ffmpeg version:"
-            ./ffmpeg -version 2>&1 | head -1
-            echo "ffprobe version:"
-            ./ffprobe -version 2>&1 | head -1
+          echo "--- ffmpeg ---"
+          ./ffmpeg -version 2>&1 | head -1 || echo "(runs via Rosetta on ARM)"
+          echo "--- ffprobe ---"
+          ./ffprobe -version 2>&1 | head -1 || echo "(runs via Rosetta on ARM)"
+          echo "--- file type ---"
+          file ffmpeg ffprobe
 
-            echo "Bundling dependent dylibs..."
-            dylibbundler -od -b \
-              -x ./ffmpeg \
-              -x ./ffprobe \
-              -d ./libs/ \
-              -p @executable_path/libs/
-
-            echo "Bundled dylibs:"
-            ls -la ./libs/
-          '
-
-      - name: Generate app icon (logo.icns)
-        run: |
-          # sips / iconutil are architecture-independent macOS tools
-          arch -x86_64 /bin/bash -c '
-            eval "$(/usr/local/bin/brew shellenv)"
-
-            python3 -c "
-          from PIL import Image, ImageDraw
-
-          size = 1024
-          img = Image.new(\"RGBA\", (size, size), (0, 0, 0, 0))
-          draw = ImageDraw.Draw(img)
-
-          margin = 40
-          draw.rounded_rectangle(
-              [margin, margin, size - margin, size - margin],
-              radius=120,
-              fill=(52, 152, 219, 255)
-          )
-
-          film_left, film_right = 180, size - 180
-          film_top, film_bottom = 320, size - 320
-          draw.rounded_rectangle(
-              [film_left, film_top, film_right, film_bottom],
-              radius=40,
-              fill=(41, 128, 185, 255)
-          )
-
-          for side_y in (film_top, film_bottom - 80):
-              for x in range(film_left + 40, film_right - 60, 80):
-                  px, py = x, side_y + 40
-                  draw.rectangle([px, py - 15, px + 40, py + 15], fill=\"black\")
-
-          cx, cy = size // 2, size // 2
-          tri_size = 120
-          draw.polygon([
-              (cx - tri_size//2, cy - tri_size),
-              (cx - tri_size//2, cy + tri_size),
-              (cx + tri_size, cy),
-          ], fill=\"white\")
-
-          img.save(\"logo.png\")
-          print(\"logo.png created\")
-          "
-          '
-
-          mkdir -p logo.iconset
-          sips -z 16 16   logo.png --out logo.iconset/icon_16x16.png
-          sips -z 32 32   logo.png --out logo.iconset/icon_16x16@2x.png
-          sips -z 32 32   logo.png --out logo.iconset/icon_32x32.png
-          sips -z 64 64   logo.png --out logo.iconset/icon_32x32@2x.png
-          sips -z 128 128 logo.png --out logo.iconset/icon_128x128.png
-          sips -z 256 256 logo.png --out logo.iconset/icon_128x128@2x.png
-          sips -z 256 256 logo.png --out logo.iconset/icon_256x256.png
-          sips -z 512 512 logo.png --out logo.iconset/icon_256x256@2x.png
-          sips -z 512 512 logo.png --out logo.iconset/icon_512x512.png
-          sips -z 1024 1024 logo.png --out logo.iconset/icon_512x512@2x.png
-          iconutil -c icns logo.iconset -o logo.icns
-          echo "logo.icns created"
-
+      # ------------------------------------------------------------------
+      # Build Intel .app (no dylib bundling needed — ffmpeg is static!)
+      # ------------------------------------------------------------------
       - name: Build Intel macOS App with PyInstaller
         run: |
           arch -x86_64 /bin/bash -c '
             eval "$(/usr/local/bin/brew shellenv)"
             export MACOSX_DEPLOYMENT_TARGET=11.0
 
-            ADD_BINS="--add-binary ffmpeg:. --add-binary ffprobe:."
-            for dylib in libs/*.dylib; do
-              ADD_BINS="$ADD_BINS --add-binary $dylib:libs/"
-            done
-            echo "PyInstaller --add-binary args: $ADD_BINS"
+            # Verify logo.icns exists (committed in repo)
+            ls -la logo.icns
 
+            # --add-binary for static ffmpeg/ffprobe only (no dylibs!)
             pyinstaller --noconsole --windowed --onefile \
               --name "VideoToFrames" \
               --icon="logo.icns" \
-              $ADD_BINS \
+              --add-binary "ffmpeg:." \
+              --add-binary "ffprobe:." \
               "video_to_frames.py"
           '
 
       - name: Create DMG
         run: |
-          arch -x86_64 /bin/bash -c '
-            eval "$(/usr/local/bin/brew shellenv)"
-            brew install create-dmg
-          '
+          brew install create-dmg
           mkdir -p output
           create-dmg \
             --volname "VideoToFrames" \
