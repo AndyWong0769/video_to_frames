@@ -10,7 +10,7 @@ env:
 
 jobs:
   build:
-    runs-on: macos-latest
+    runs-on: macos-13
 
     steps:
       - name: Checkout code
@@ -32,13 +32,13 @@ jobs:
       - name: Download macOS ffmpeg & ffprobe static builds
         run: |
           echo "Downloading macOS static ffmpeg..."
-          curl -L -o ffmpeg.zip "https://evermeet.cx/ffmpeg/get/ffmpeg"
+          curl -L -o ffmpeg.zip "https://evermeet.cx/ffmpeg/getrelease/zip"
           unzip -o ffmpeg.zip
           chmod +x ffmpeg
           rm ffmpeg.zip
 
           echo "Downloading macOS static ffprobe..."
-          curl -L -o ffprobe.zip "https://evermeet.cx/ffmpeg/get/ffprobe"
+          curl -L -o ffprobe.zip "https://evermeet.cx/ffmpeg/getrelease/ffprobe/zip"
           unzip -o ffprobe.zip
           chmod +x ffprobe
           rm ffprobe.zip
@@ -125,7 +125,6 @@ jobs:
             --icon="logo.icns" \
             --add-data "ffmpeg:." \
             --add-data "ffprobe:." \
-            --target-arch universal2 \
             "video_to_frames.py"
 
       - name: Create DMG
