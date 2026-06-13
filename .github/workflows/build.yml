@@ -73,44 +73,74 @@ jobs:
           file ffmpeg ffprobe
 
       # ------------------------------------------------------------------
-      # Build Intel .app (no dylib bundling needed — ffmpeg is static!)
+      # Build Intel .apps — Chinese + English
       # ------------------------------------------------------------------
-      - name: Build Intel macOS App with PyInstaller
+      - name: Build Chinese version (video_to_frames.py)
         run: |
           arch -x86_64 /bin/bash -c '
             eval "$(/usr/local/bin/brew shellenv)"
             export MACOSX_DEPLOYMENT_TARGET=11.0
-
-            # Verify logo.icns exists (committed in repo)
             ls -la logo.icns
-
-            # --add-binary for static ffmpeg/ffprobe only (no dylibs!)
             pyinstaller --noconsole --windowed --onefile \
-              --name "VideoToFrames" \
+              --name "VideoToFrames_CN" \
               --icon="logo.icns" \
               --add-binary "ffmpeg:." \
               --add-binary "ffprobe:." \
               "video_to_frames.py"
           '
 
-      - name: Create DMG
+      - name: Build English version (video_to_frames_en.py)
+        run: |
+          arch -x86_64 /bin/bash -c '
+            eval "$(/usr/local/bin/brew shellenv)"
+            export MACOSX_DEPLOYMENT_TARGET=11.0
+            pyinstaller --noconsole --windowed --onefile \
+              --name "VideoToFrames_EN" \
+              --icon="logo.icns" \
+              --add-binary "ffmpeg:." \
+              --add-binary "ffprobe:." \
+              "video_to_frames_en.py"
+          '
+
+      - name: Create DMGs
         run: |
           brew install create-dmg
           mkdir -p output
+
+          # Chinese DMG
           create-dmg \
-            --volname "VideoToFrames" \
+            --volname "VideoToFrames CN" \
             --volicon "logo.icns" \
             --window-pos 200 120 \
             --window-size 600 400 \
             --icon-size 100 \
-            --icon "VideoToFrames.app" 175 190 \
-            --hide-extension "VideoToFrames.app" \
+            --icon "VideoToFrames_CN.app" 175 190 \
+            --hide-extension "VideoToFrames_CN.app" \
             --app-drop-link 425 190 \
-            "output/VideoToFrames_Installer.dmg" \
-            "dist/VideoToFrames.app"
+            "output/VideoToFrames_CN_Installer.dmg" \
+            "dist/VideoToFrames_CN.app"
 
-      - name: Upload DMG Artifact
+          # English DMG
+          create-dmg \
+            --volname "VideoToFrames EN" \
+            --volicon "logo.icns" \
+            --window-pos 200 120 \
+            --window-size 600 400 \
+            --icon-size 100 \
+            --icon "VideoToFrames_EN.app" 175 190 \
+            --hide-extension "VideoToFrames_EN.app" \
+            --app-drop-link 425 190 \
+            "output/VideoToFrames_EN_Installer.dmg" \
+            "dist/VideoToFrames_EN.app"
+
+      - name: Upload CN DMG
         uses: actions/upload-artifact@v4
         with:
-          name: VideoToFrames-macOS-DMG
-          path: output/*.dmg
+          name: VideoToFrames-CN-中文版
+          path: output/VideoToFrames_CN_Installer.dmg
+
+      - name: Upload EN DMG
+        uses: actions/upload-artifact@v4
+        with:
+          name: VideoToFrames-EN-English
+          path: output/VideoToFrames_EN_Installer.dmg
