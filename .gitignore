@@ -1,0 +1,32 @@
+# Windows ffmpeg binaries (macOS ones are downloaded in CI)
+ffmpeg.exe
+ffprobe.exe
+
+# PyInstaller build artifacts
+build/
+dist/
+*.spec
+
+# macOS icon build artifacts
+logo.iconset/
+logo.png
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# DMG output
+output/
+*.dmg
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini

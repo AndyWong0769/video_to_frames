@@ -1,0 +1,151 @@
+name: Build VideoToFrames (macOS DMG)
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Python dependencies
+        run: |
+          pip install pyinstaller
+
+      - name: Ensure Tkinter support on macOS
+        run: |
+          brew install python-tk || true
+
+      - name: Download macOS ffmpeg & ffprobe static builds
+        run: |
+          echo "Downloading macOS static ffmpeg..."
+          curl -L -o ffmpeg.zip "https://evermeet.cx/ffmpeg/get/ffmpeg"
+          unzip -o ffmpeg.zip
+          chmod +x ffmpeg
+          rm ffmpeg.zip
+
+          echo "Downloading macOS static ffprobe..."
+          curl -L -o ffprobe.zip "https://evermeet.cx/ffmpeg/get/ffprobe"
+          unzip -o ffprobe.zip
+          chmod +x ffprobe
+          rm ffprobe.zip
+
+          echo "ffmpeg version:"
+          ./ffmpeg -version 2>&1 | head -1
+          echo "ffprobe version:"
+          ./ffprobe -version 2>&1 | head -1
+
+      - name: Generate app icon (logo.icns)
+        run: |
+          pip install Pillow
+          python3 -c "
+          from PIL import Image, ImageDraw
+          import os
+
+          # Create a 1024x1024 icon with a film/video theme
+          size = 1024
+          img = Image.new('RGBA', (size, size), (0, 0, 0, 0))
+          draw = ImageDraw.Draw(img)
+
+          # Background: rounded rectangle (dark blue)
+          margin = 40
+          draw.rounded_rectangle(
+              [margin, margin, size - margin, size - margin],
+              radius=120,
+              fill=(52, 152, 219, 255)
+          )
+
+          # Film strip: horizontal rectangle
+          film_left = 180
+          film_right = size - 180
+          film_top = 320
+          film_bottom = size - 320
+          draw.rounded_rectangle(
+              [film_left, film_top, film_right, film_bottom],
+              radius=40,
+              fill=(41, 128, 185, 255)
+          )
+
+          # Film perforations (small squares on top and bottom)
+          for side_y, poke_dir in [(film_top, -1), (film_bottom - 80, 1)]:
+              for x in range(film_left + 40, film_right - 60, 80):
+                  px, py = x, side_y + 40
+                  draw.rectangle([px, py - 15, px + 40, py + 15], fill='black')
+
+          # Play triangle in center
+          cx, cy = size // 2, size // 2
+          tri_size = 120
+          tri = [
+              (cx - tri_size//2, cy - tri_size),
+              (cx - tri_size//2, cy + tri_size),
+              (cx + tri_size, cy),
+          ]
+          draw.polygon(tri, fill='white')
+
+          # Save as PNG
+          img.save('logo.png')
+          print('Icon PNG created: logo.png')
+          "
+
+          # Convert PNG to ICNS using macOS iconutil
+          mkdir -p logo.iconset
+
+          sips -z 16 16   logo.png --out logo.iconset/icon_16x16.png
+          sips -z 32 32   logo.png --out logo.iconset/icon_16x16@2x.png
+          sips -z 32 32   logo.png --out logo.iconset/icon_32x32.png
+          sips -z 64 64   logo.png --out logo.iconset/icon_32x32@2x.png
+          sips -z 128 128 logo.png --out logo.iconset/icon_128x128.png
+          sips -z 256 256 logo.png --out logo.iconset/icon_128x128@2x.png
+          sips -z 256 256 logo.png --out logo.iconset/icon_256x256.png
+          sips -z 512 512 logo.png --out logo.iconset/icon_256x256@2x.png
+          sips -z 512 512 logo.png --out logo.iconset/icon_512x512.png
+          sips -z 1024 1024 logo.png --out logo.iconset/icon_512x512@2x.png
+
+          iconutil -c icns logo.iconset -o logo.icns
+          echo "Icon ICNS created: logo.icns"
+
+      - name: Build macOS App with PyInstaller
+        run: |
+          export MACOSX_DEPLOYMENT_TARGET=11.0
+          pyinstaller --noconsole --windowed --onefile \
+            --name "VideoToFrames" \
+            --icon="logo.icns" \
+            --add-data "ffmpeg:." \
+            --add-data "ffprobe:." \
+            --target-arch universal2 \
+            "video_to_frames.py"
+
+      - name: Create DMG
+        run: |
+          brew install create-dmg
+          mkdir -p output
+          create-dmg \
+            --volname "VideoToFrames" \
+            --volicon "logo.icns" \
+            --window-pos 200 120 \
+            --window-size 600 400 \
+            --icon-size 100 \
+            --icon "VideoToFrames.app" 175 190 \
+            --hide-extension "VideoToFrames.app" \
+            --app-drop-link 425 190 \
+            "output/VideoToFrames_Installer.dmg" \
+            "dist/VideoToFrames.app"
+
+      - name: Upload DMG Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: VideoToFrames-macOS-DMG
+          path: output/*.dmg
