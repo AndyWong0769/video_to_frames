@@ -24,8 +24,17 @@ class VideoToFramesApp:
         style.theme_use("clam")
         style.configure("TLabel", background="#f5f7fa", foreground="#2c3e50", font=("Segoe UI", 10))
         style.configure("TButton", font=("Segoe UI", 9), padding=6)
-        style.configure("Accent.TButton", background="#3498db", foreground="white")
-        style.map("Accent.TButton", background=[("active", "#2980b9")])
+
+        # Green convert button style (ttk.Button works on macOS, tk.Button ignores bg)
+        style.configure("Green.TButton",
+                        background="#2ecc71",
+                        foreground="white",
+                        font=("Segoe UI", 12, "bold"),
+                        padding=10,
+                        borderwidth=0)
+        style.map("Green.TButton",
+                  background=[("active", "#27ae60"), ("disabled", "#95a5a6")],
+                  foreground=[("disabled", "#ecf0f1")])
 
         # Custom green progress bar style
         style.configure("Green.Horizontal.TProgressbar",
@@ -56,22 +65,31 @@ class VideoToFramesApp:
             if sys.platform == "win32":
                 candidate = os.path.join(base_path, tool_name + ".exe")
                 if os.path.exists(candidate):
+                    self._ensure_executable(candidate)
                     return candidate
             else:
                 # macOS / Linux: binary has no extension
                 candidate = os.path.join(base_path, tool_name)
                 if os.path.exists(candidate):
+                    self._ensure_executable(candidate)
                     return candidate
-            # Fallback: check without extension on all platforms
-            candidate_noext = os.path.join(base_path, tool_name)
-            if os.path.exists(candidate_noext):
-                return candidate_noext
         # Development mode: check local directory with platform extension
         local_exe = tool_name + ".exe" if sys.platform == "win32" else tool_name
         if os.path.exists(local_exe):
+            self._ensure_executable(local_exe)
             return local_exe
         # Last resort: system PATH
         return shutil.which(tool_name)
+
+    @staticmethod
+    def _ensure_executable(path):
+        """Ensure binary has execute permission (PyInstaller may not preserve it)"""
+        try:
+            st = os.stat(path)
+            if not (st.st_mode & 0o111):
+                os.chmod(path, st.st_mode | 0o111)
+        except Exception:
+            pass
 
     def create_widgets(self):
         # Title
@@ -128,20 +146,12 @@ class VideoToFramesApp:
         self.status_label = tk.Label(main_frame, text="Ready", bg="#f5f7fa", fg="#7f8c8d", font=("Segoe UI", 9))
         self.status_label.pack(pady=(5, 10))
 
-        # 6. Convert button
-        btn_convert = tk.Button(main_frame, text="✨ Start Conversion ✨", command=self.start_conversion,
-                                bg="#3498db", fg="white", font=("Segoe UI", 12, "bold"),
-                                relief="flat", bd=0, padx=20, pady=8, cursor="hand2")
+        # 6. Convert button (ttk.Button for proper macOS styling)
+        btn_convert = ttk.Button(main_frame, text="✨ Start Conversion ✨",
+                                 command=self.start_conversion,
+                                 style="Green.TButton")
         btn_convert.pack(pady=(10, 8))
         self.convert_btn = btn_convert
-
-        # Hover effects
-        def on_enter(e):
-            btn_convert.config(bg="#2980b9")
-        def on_leave(e):
-            btn_convert.config(bg="#3498db")
-        btn_convert.bind("<Enter>", on_enter)
-        btn_convert.bind("<Leave>", on_leave)
 
     def browse_video(self):
         path = filedialog.askopenfilename(
@@ -185,7 +195,7 @@ class VideoToFramesApp:
             return
 
         self.converting = True
-        self.convert_btn.config(state="disabled", text="Converting...", bg="#95a5a6")
+        self.convert_btn.config(state="disabled", text="Converting...")
         self.progress_bar["value"] = 0
         self.progress_bar["mode"] = "determinate"
         self.status_label.config(text="Extracting frames, please wait...", fg="#e67e22")
@@ -275,7 +285,7 @@ class VideoToFramesApp:
             messagebox.showerror("Exception", str(e))
         finally:
             self.converting = False
-            self.convert_btn.config(state="normal", text="✨ Start Conversion ✨", bg="#3498db")
+            self.convert_btn.config(state="normal", text="✨ Start Conversion ✨")
             self.process = None
             if total_frames <= 0:
                 self.progress_bar.stop()
