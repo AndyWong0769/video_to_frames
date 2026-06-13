@@ -135,7 +135,7 @@ class VideoToFramesApp:
         # 3. Frames per second
         row3 = tk.Frame(main_frame, bg="#f5f7fa")
         row3.pack(fill="x", pady=8)
-        tk.Label(row3, text="帧数：", width=14, anchor="e", bg="#f5f7fa",
+        tk.Label(row3, text="⏱️ 每秒帧数：", width=14, anchor="e", bg="#f5f7fa",
                  font=(self.FONT_UI, 10)).pack(side="left")
         spin_fps = tk.Spinbox(row3, from_=0.1, to=30, increment=0.5,
                               textvariable=self.fps, width=8,
