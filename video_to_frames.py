@@ -2,6 +2,7 @@ import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 import subprocess
 import os
+import platform
 import threading
 import re
 import shutil
@@ -10,10 +11,15 @@ import sys
 class VideoToFramesApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("Video to Frames · Frame Extractor")
+        self.root.title("视频转帧工具 · Video to Frames")
         self.root.geometry("620x450")
         self.root.resizable(False, False)
         self.root.configure(bg="#f5f7fa")
+
+        # Pick appropriate font for the platform
+        curr_os = platform.system()
+        self.FONT_UI = "PingFang SC" if curr_os == "Darwin" else "Microsoft YaHei"
+        self.FONT_MONO = "SF Mono" if curr_os == "Darwin" else "Consolas"
 
         # Locate ffmpeg/ffprobe paths (supports pyinstaller packaged paths)
         self.ffmpeg_path = self.get_ffmpeg_path("ffmpeg")
@@ -22,14 +28,15 @@ class VideoToFramesApp:
         # Styles
         style = ttk.Style()
         style.theme_use("clam")
-        style.configure("TLabel", background="#f5f7fa", foreground="#2c3e50", font=("Segoe UI", 10))
-        style.configure("TButton", font=("Segoe UI", 9), padding=6)
+        style.configure("TLabel", background="#f5f7fa", foreground="#2c3e50",
+                        font=(self.FONT_UI, 10))
+        style.configure("TButton", font=(self.FONT_UI, 9), padding=6)
 
-        # Green convert button style (ttk.Button works on macOS, tk.Button ignores bg)
+        # Green convert button style
         style.configure("Green.TButton",
                         background="#2ecc71",
                         foreground="white",
-                        font=("Segoe UI", 12, "bold"),
+                        font=(self.FONT_UI, 12, "bold"),
                         padding=10,
                         borderwidth=0)
         style.map("Green.TButton",
@@ -93,7 +100,7 @@ class VideoToFramesApp:
 
     def create_widgets(self):
         # Title
-        title = tk.Label(self.root, text="🎬 Video to Frames Tool", font=("Segoe UI", 16, "bold"),
+        title = tk.Label(self.root, text="🎬 视频转帧工具", font=(self.FONT_UI, 16, "bold"),
                          bg="#f5f7fa", fg="#2c3e50")
         title.pack(pady=(20, 15))
 
@@ -104,50 +111,64 @@ class VideoToFramesApp:
         # 1. Video file selection
         row1 = tk.Frame(main_frame, bg="#f5f7fa")
         row1.pack(fill="x", pady=8)
-        tk.Label(row1, text="📹 Video file:", width=12, anchor="e", bg="#f5f7fa", font=("Segoe UI", 10)).pack(side="left")
-        entry_video = tk.Entry(row1, textvariable=self.video_path, font=("Consolas", 9), bg="white", relief="solid", bd=1)
+        tk.Label(row1, text="📹 视频文件：", width=14, anchor="e", bg="#f5f7fa",
+                 font=(self.FONT_UI, 10)).pack(side="left")
+        entry_video = tk.Entry(row1, textvariable=self.video_path,
+                               font=(self.FONT_MONO, 9), bg="white", relief="solid", bd=1)
         entry_video.pack(side="left", fill="x", expand=True, padx=5)
-        btn_browse_video = tk.Button(row1, text="Browse", command=self.browse_video, bg="#ecf0f1", font=("Segoe UI", 9), width=6)
+        btn_browse_video = tk.Button(row1, text="浏览", command=self.browse_video,
+                                      bg="#ecf0f1", font=(self.FONT_UI, 9), width=6)
         btn_browse_video.pack(side="right")
 
         # 2. Output folder
         row2 = tk.Frame(main_frame, bg="#f5f7fa")
         row2.pack(fill="x", pady=8)
-        tk.Label(row2, text="📁 Output folder:", width=12, anchor="e", bg="#f5f7fa", font=("Segoe UI", 10)).pack(side="left")
-        entry_out = tk.Entry(row2, textvariable=self.output_dir, font=("Consolas", 9), bg="white", relief="solid", bd=1)
+        tk.Label(row2, text="📁 输出目录：", width=14, anchor="e", bg="#f5f7fa",
+                 font=(self.FONT_UI, 10)).pack(side="left")
+        entry_out = tk.Entry(row2, textvariable=self.output_dir,
+                             font=(self.FONT_MONO, 9), bg="white", relief="solid", bd=1)
         entry_out.pack(side="left", fill="x", expand=True, padx=5)
-        btn_browse_out = tk.Button(row2, text="Browse", command=self.browse_output_dir, bg="#ecf0f1", font=("Segoe UI", 9), width=6)
+        btn_browse_out = tk.Button(row2, text="浏览", command=self.browse_output_dir,
+                                    bg="#ecf0f1", font=(self.FONT_UI, 9), width=6)
         btn_browse_out.pack(side="right")
 
         # 3. Frames per second
         row3 = tk.Frame(main_frame, bg="#f5f7fa")
         row3.pack(fill="x", pady=8)
-        tk.Label(row3, text="Frames per second:", width=12, anchor="e", bg="#f5f7fa", font=("Segoe UI", 10)).pack(side="left")
-        spin_fps = tk.Spinbox(row3, from_=0.1, to=30, increment=0.5, textvariable=self.fps, width=8, font=("Consolas", 9),
-                              relief="solid", bd=1)
+        tk.Label(row3, text="每秒帧数：", width=14, anchor="e", bg="#f5f7fa",
+                 font=(self.FONT_UI, 10)).pack(side="left")
+        spin_fps = tk.Spinbox(row3, from_=0.1, to=30, increment=0.5,
+                              textvariable=self.fps, width=8,
+                              font=(self.FONT_MONO, 9), relief="solid", bd=1)
         spin_fps.pack(side="left", padx=5)
-        tk.Label(row3, text=" (frames/sec, e.g., 1 = one frame per second)", bg="#f5f7fa", fg="#7f8c8d", font=("Segoe UI", 8)).pack(side="left", padx=10)
+        tk.Label(row3, text="（帧/秒，如 1 = 每秒一帧）", bg="#f5f7fa", fg="#7f8c8d",
+                 font=(self.FONT_UI, 8)).pack(side="left", padx=10)
 
         # 4. Image format selection
         row4 = tk.Frame(main_frame, bg="#f5f7fa")
         row4.pack(fill="x", pady=8)
-        tk.Label(row4, text="🖼️ Image format:", width=12, anchor="e", bg="#f5f7fa", font=("Segoe UI", 10)).pack(side="left")
-        radio_jpg = tk.Radiobutton(row4, text="JPEG", variable=self.img_format, value="JPEG", bg="#f5f7fa", font=("Segoe UI", 9))
+        tk.Label(row4, text="🖼️ 图片格式：", width=14, anchor="e", bg="#f5f7fa",
+                 font=(self.FONT_UI, 10)).pack(side="left")
+        radio_jpg = tk.Radiobutton(row4, text="JPEG", variable=self.img_format,
+                                    value="JPEG", bg="#f5f7fa", font=(self.FONT_UI, 9))
         radio_jpg.pack(side="left", padx=10)
-        radio_png = tk.Radiobutton(row4, text="PNG", variable=self.img_format, value="PNG", bg="#f5f7fa", font=("Segoe UI", 9))
+        radio_png = tk.Radiobutton(row4, text="PNG", variable=self.img_format,
+                                    value="PNG", bg="#f5f7fa", font=(self.FONT_UI, 9))
         radio_png.pack(side="left", padx=10)
 
-        # 5. Progress bar + status (using green style)
+        # 5. Progress bar + status
         progress_frame = tk.Frame(main_frame, bg="#f5f7fa")
         progress_frame.pack(fill="x", pady=(20, 5))
         self.progress_bar = ttk.Progressbar(progress_frame, orient="horizontal", length=500,
-                                            mode="determinate", style="Green.Horizontal.TProgressbar")
+                                            mode="determinate",
+                                            style="Green.Horizontal.TProgressbar")
         self.progress_bar.pack(fill="x", padx=5)
-        self.status_label = tk.Label(main_frame, text="Ready", bg="#f5f7fa", fg="#7f8c8d", font=("Segoe UI", 9))
+        self.status_label = tk.Label(main_frame, text="就绪", bg="#f5f7fa", fg="#7f8c8d",
+                                     font=(self.FONT_UI, 9))
         self.status_label.pack(pady=(5, 10))
 
-        # 6. Convert button (ttk.Button for proper macOS styling)
-        btn_convert = ttk.Button(main_frame, text="✨ Start Conversion ✨",
+        # 6. Convert button
+        btn_convert = ttk.Button(main_frame, text="✨ 开始转换",
                                  command=self.start_conversion,
                                  style="Green.TButton")
         btn_convert.pack(pady=(10, 8))
@@ -155,8 +176,9 @@ class VideoToFramesApp:
 
     def browse_video(self):
         path = filedialog.askopenfilename(
-            title="Select video file",
-            filetypes=[("Video files", "*.mp4 *.avi *.mov *.mkv *.flv *.wmv *.mts"), ("All files", "*.*")]
+            title="选择视频文件",
+            filetypes=[("视频文件", "*.mp4 *.avi *.mov *.mkv *.flv *.wmv *.mts"),
+                       ("所有文件", "*.*")]
         )
         if path:
             self.video_path.set(path)
@@ -164,26 +186,28 @@ class VideoToFramesApp:
                 self.output_dir.set(os.path.dirname(path))
 
     def browse_output_dir(self):
-        directory = filedialog.askdirectory(title="Select output folder")
+        directory = filedialog.askdirectory(title="选择输出目录")
         if directory:
             self.output_dir.set(directory)
 
     def start_conversion(self):
         if self.converting:
-            messagebox.showwarning("Info", "Conversion is already in progress, please wait...")
+            messagebox.showwarning("提示", "正在转换中，请稍候……")
             return
         if not self.video_path.get():
-            messagebox.showerror("Error", "Please select a video file first")
+            messagebox.showerror("错误", "请先选择视频文件")
             return
         if not self.output_dir.get():
-            messagebox.showerror("Error", "Please select an output folder")
+            messagebox.showerror("错误", "请先选择输出目录")
             return
         if not os.path.exists(self.video_path.get()):
-            messagebox.showerror("Error", "Video file does not exist")
+            messagebox.showerror("错误", "视频文件不存在")
             return
         # Check if ffmpeg exists
         if not self.ffmpeg_path or not os.path.exists(self.ffmpeg_path):
-            messagebox.showerror("Error", "ffmpeg not found. Please ensure ffmpeg is installed and added to PATH, or place it in the same directory as this program.")
+            messagebox.showerror("错误",
+                "找不到 ffmpeg，请确保 ffmpeg 已正确安装，\n"
+                "或将 ffmpeg 放在本程序同目录下。")
             return
 
         try:
@@ -191,14 +215,14 @@ class VideoToFramesApp:
             if fps_val <= 0:
                 raise ValueError
         except ValueError:
-            messagebox.showerror("Error", "Frames per second must be a positive number")
+            messagebox.showerror("错误", "每秒帧数必须为正数")
             return
 
         self.converting = True
-        self.convert_btn.config(state="disabled", text="Converting...")
+        self.convert_btn.config(state="disabled", text="转换中……")
         self.progress_bar["value"] = 0
         self.progress_bar["mode"] = "determinate"
-        self.status_label.config(text="Extracting frames, please wait...", fg="#e67e22")
+        self.status_label.config(text="正在提取帧，请稍候……", fg="#e67e22")
 
         thread = threading.Thread(target=self.extract_frames, daemon=True)
         thread.start()
@@ -218,11 +242,11 @@ class VideoToFramesApp:
         duration = self.get_duration(video_file)
         total_frames = int(duration * fps) if duration > 0 else 0
 
-        # If total frames cannot be obtained, switch to indeterminate mode (green scrolling bar)
+        # If total frames cannot be obtained, switch to indeterminate mode
         if total_frames <= 0:
             self.progress_bar["mode"] = "indeterminate"
             self.progress_bar.start(10)
-            self.status_label.config(text="Unable to estimate total frames, but extraction continues...")
+            self.status_label.config(text="无法估算总帧数，提取仍将继续……")
         else:
             self.progress_bar["mode"] = "determinate"
             self.progress_bar["value"] = 0
@@ -260,10 +284,11 @@ class VideoToFramesApp:
                     if total_frames > 0:
                         percent = min(100, (frame_count / total_frames) * 100)
                         self.progress_bar["value"] = percent
-                        self.status_label.config(text=f"Extracted {frame_count} frames / ~{total_frames} total frames")
+                        self.status_label.config(
+                            text=f"已提取 {frame_count} 帧 / 预计共 {total_frames} 帧")
                     else:
-                        # Indeterminate mode: show frame count only, progress bar scrolls on its own
-                        self.status_label.config(text=f"Extracted {frame_count} frames (total unknown)")
+                        self.status_label.config(
+                            text=f"已提取 {frame_count} 帧（总数未知）")
                     self.root.update_idletasks()
 
             returncode = process.wait()
@@ -275,17 +300,21 @@ class VideoToFramesApp:
                 self.progress_bar["value"] = 100
 
             if returncode == 0:
-                self.status_label.config(text=f"✅ Conversion complete! Extracted {frame_count} images", fg="#27ae60")
-                messagebox.showinfo("Complete", f"Successfully extracted {frame_count} frames from video. Saved to:\n{out_dir}")
+                self.status_label.config(
+                    text=f"✅ 转换完成！共提取 {frame_count} 张图片", fg="#27ae60")
+                messagebox.showinfo("完成",
+                    f"成功从视频中提取了 {frame_count} 帧。\n保存到：\n{out_dir}")
             else:
-                self.status_label.config(text="❌ Conversion failed. Please check video or ffmpeg", fg="#e74c3c")
-                messagebox.showerror("Error", "ffmpeg execution error. Please ensure ffmpeg is available and the video file is not corrupted.")
+                self.status_label.config(
+                    text="❌ 转换失败，请检查视频文件或 ffmpeg", fg="#e74c3c")
+                messagebox.showerror("错误",
+                    "ffmpeg 执行出错，请确认 ffmpeg 可用且视频文件未损坏。")
         except Exception as e:
-            self.status_label.config(text=f"Error: {str(e)}", fg="#e74c3c")
-            messagebox.showerror("Exception", str(e))
+            self.status_label.config(text=f"错误：{str(e)}", fg="#e74c3c")
+            messagebox.showerror("异常", str(e))
         finally:
             self.converting = False
-            self.convert_btn.config(state="normal", text="✨ Start Conversion ✨")
+            self.convert_btn.config(state="normal", text="✨ 开始转换")
             self.process = None
             if total_frames <= 0:
                 self.progress_bar.stop()
